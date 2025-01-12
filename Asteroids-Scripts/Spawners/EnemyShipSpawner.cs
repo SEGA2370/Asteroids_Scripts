@@ -8,7 +8,7 @@ public class EnemyShipSpawner : SingletonMonoBehaviour<EnemyShipSpawner>
     [SerializeField] Transform[] _spawnPoints, _waypoints;
     [Header("Spawn delay settings")]
     [SerializeField]
-    float _initialSpawnDelay = 30f,
+    float /*_initialSpawnDelay = 30f,*/
           _subsequentSpawnDelay = 10f,
           _minSpawnDelay = 5f,
           _spawnDelayDecrement = 0.1f;

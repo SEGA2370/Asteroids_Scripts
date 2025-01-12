@@ -2,27 +2,19 @@ using UnityEngine;
 
 public class GameManager : SingletonMonoBehaviour<GameManager>
 {
-    [SerializeField] float _spawnShipDelayTime = 2f;
-    [SerializeField] int _pointsForExtraLife = 10000;
+    [SerializeField] private float _spawnShipDelayTime = 2f;
+    [SerializeField] private int _pointsForExtraLife = 10000;
+
     public int Round { get; private set; }
     public int Score { get; private set; }
     public int HighScore { get; private set; }
     public PlayerShip PlayerShip => _playerShip;
 
-    GameState _gameState = GameState.StartGame;
-    int Lives { get; set; }
-    int _nextExtraLifeScore;
-    PlayerShip _playerShip;
-    Timer _nextRoundTimer, _spawnShipTimer;
-
-    public void RestartGame()
-    {
-        AsteroidSpawner.Instance.ReleaseAllAsteroids();
-        ReleaseTimers();
-        SetGameState(GameState.StartGame); // Reset GameState
-        StartGame(); // Restart from scratch
-        Resources.UnloadUnusedAssets();
-    }
+    private GameState _gameState = GameState.StartGame;
+    private int Lives { get; set; }
+    private int _nextExtraLifeScore;
+    private PlayerShip _playerShip;
+    private Timer _nextRoundTimer, _spawnShipTimer;
 
     protected override void Awake()
     {
@@ -36,12 +28,32 @@ public class GameManager : SingletonMonoBehaviour<GameManager>
         StartGame();
     }
 
-    void StartFirstRound()
+    public void RestartGame()
+    {
+        AsteroidSpawner.Instance.ReleaseAllAsteroids();
+        ReleaseTimers();
+        SetGameState(GameState.StartGame);
+        StartGame();
+        Resources.UnloadUnusedAssets(); // Consider removing this unless necessary
+    }
+
+    private void StartGame()
+    {
+        Debug.Log("Starting Game...");
+        Lives = 3;
+        Score = 0;
+        Round = 0;
+        _nextExtraLifeScore = _pointsForExtraLife;
+        _playerShip.ReviveShip();
+        StartFirstRound();
+    }
+
+    private void StartFirstRound()
     {
         if (_gameState == GameState.StartFirstRound) return; // Prevent re-triggering
         Debug.Log("Starting First Round...");
         CreateTimers();
-        ++Round;
+        Round++;
         AddPoints(0);
         SetGameState(GameState.StartFirstRound);
         StartSpawnShipTimer();
@@ -49,8 +61,11 @@ public class GameManager : SingletonMonoBehaviour<GameManager>
 
     public void RoundOver()
     {
-        SetGameState(GameState.RoundOver);
-        StartNextRoundTimer();
+        if (AsteroidSpawner.Instance.ActiveAsteroidsCount == 0) // Check if all asteroids are destroyed
+        {
+            SetGameState(GameState.RoundOver);
+            StartNextRoundTimer();
+        }
     }
 
     public void PlayerDied()
@@ -61,21 +76,23 @@ public class GameManager : SingletonMonoBehaviour<GameManager>
         {
             SetGameState(GameState.PlayerDied);
             StartSpawnShipTimer();
-            return;
         }
-        GameOver();
+        else
+        {
+            GameOver();
+        }
     }
 
-    void GameOver()
+    private void GameOver()
     {
         ReleaseTimers();
         SetGameState(GameState.GameOver);
         EventBus.Instance.Raise(new PlayMusicEvent("GameOver"));
-        DisableAllActiveAsteroids(); // Ensure all asteroids are disabled
-        System.GC.Collect();
+        DisableAllActiveAsteroids();
         SettingsManager.Instance.SetSetting("HighScore", HighScore.ToString(), true);
     }
-    void DisableAllActiveAsteroids()
+
+    private void DisableAllActiveAsteroids()
     {
         foreach (var asteroid in FindObjectsOfType<Asteroid>())
         {
@@ -83,12 +100,12 @@ public class GameManager : SingletonMonoBehaviour<GameManager>
         }
     }
 
-    void StartNextRoundTimer()
+    private void StartNextRoundTimer()
     {
         _nextRoundTimer.Start(3f);
     }
 
-    void StartSpawnShipTimer()
+    private void StartSpawnShipTimer()
     {
         _spawnShipTimer.Start(_spawnShipDelayTime);
     }
@@ -100,74 +117,75 @@ public class GameManager : SingletonMonoBehaviour<GameManager>
         EventBus.Instance.Raise(new ScoreChangedEvent(Score, HighScore));
         CheckForExtraLife();
     }
-    void CheckForExtraLife()
+
+    private void CheckForExtraLife()
     {
-        if (Score < _nextExtraLifeScore) return;
-        _nextExtraLifeScore += _pointsForExtraLife;
-        SfxManager.Instance.PlayClip(SoundEffectsClip.ExtraLife);
-        EventBus.Instance.Raise(new PlayerLivesChangedEvent(++Lives));
+        if (Score >= _nextExtraLifeScore)
+        {
+            _nextExtraLifeScore += _pointsForExtraLife;
+            SfxManager.Instance.PlayClip(SoundEffectsClip.ExtraLife);
+            EventBus.Instance.Raise(new PlayerLivesChangedEvent(++Lives));
+        }
     }
-    void CreateTimers()
+
+    private void CreateTimers()
     {
         _nextRoundTimer = TimerManager.Instance.CreateTimer<CountdownTimer>();
         _spawnShipTimer = TimerManager.Instance.CreateTimer<CountdownTimer>();
         _nextRoundTimer.OnTimerStop += StartNextRound;
         _spawnShipTimer.OnTimerStop += SpawnShip;
     }
-    void ReleaseTimers()
+
+    private void ReleaseTimers()
     {
         if (_nextRoundTimer != null)
         {
             _nextRoundTimer.Stop();
-            TimerManager.Instance?.ReleaseTimer<CountdownTimer>(_nextRoundTimer);
+            TimerManager.Instance.ReleaseTimer<CountdownTimer>(_nextRoundTimer);
             _nextRoundTimer = null;
         }
 
         if (_spawnShipTimer != null)
         {
             _spawnShipTimer.Stop();
-            TimerManager.Instance?.ReleaseTimer<CountdownTimer>(_spawnShipTimer);
+            TimerManager.Instance.ReleaseTimer<CountdownTimer>(_spawnShipTimer);
             _spawnShipTimer = null;
         }
     }
-    void StartNextRound()
+
+    private void StartNextRound()
     {
-        ++Round;
+        Round++;
         SetGameState(GameState.StartRound);
     }
-    void StartGame()
-    {
-        Debug.Log("Starting Game...");
-        Lives = 3;
-        Score = 0;
-        Round = 0;
-        _nextExtraLifeScore = _pointsForExtraLife;
-        _playerShip.ReviveShip();
-        StartFirstRound();
-    }
-    void SpawnShip()
+
+    private void SpawnShip()
     {
         EventBus.Instance.Raise(new PlayerLivesChangedEvent(--Lives));
         SetGameState(GameState.ShipSpawned);
-        _playerShip.ReviveShip(); // Call ReviveShip here to enable the ship
+        _playerShip.ReviveShip();
         _playerShip.ResetShipToStartPosition();
         _playerShip.EnableInvulnerability();
         EventBus.Instance.Raise(new PlayMusicEvent("Game"));
     }
-    void SetGameState(GameState gameState)
+
+    private void SetGameState(GameState gameState)
     {
         _gameState = gameState;
         EventBus.Instance.Raise(new GameStateChangedEvent(_gameState));
     }
+
     public void PauseGame()
     {
         Time.timeScale = 0;
     }
+
     public void ResumeGame()
     {
         Time.timeScale = 1;
-    }   
+    }
 }
+
 public enum GameState
 {
     StartGame,

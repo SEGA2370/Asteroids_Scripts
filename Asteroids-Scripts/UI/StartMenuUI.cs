@@ -28,7 +28,7 @@ public class StartMenuUI : MonoBehaviour
 #else
         _playerInput = gameObject.AddComponent<PlayerKeyboardInput>();
         _playerKeyboardInput = (PlayerKeyboardInput)_playerInput;
-    //    _playButton.gameObject.SetActive(false);
+        _playButton.gameObject.SetActive(false);
         _pressSpaceText.SetActive(true);
 #endif
     }
@@ -41,7 +41,7 @@ public class StartMenuUI : MonoBehaviour
 #if !UNITY_IOS && !UNITY_ANDROID
         EventBus.Instance.Subscribe<SettingsSavedEvent>(OnSettingsUpdated);
 #endif
-        //_playButton.onClick.AddListener(StartGame);
+        _playButton.onClick.AddListener(StartGame);
         UpdateControlsText();
     }
 
@@ -50,7 +50,7 @@ public class StartMenuUI : MonoBehaviour
 #if !UNITY_IOS && !UNITY_ANDROID
         EventBus.Instance?.Unsubscribe<SettingsSavedEvent>(OnSettingsUpdated);
 #endif
-        //_playButton.onClick.RemoveListener(StartGame);
+        _playButton.onClick.RemoveListener(StartGame);
     }
 
 #if !UNITY_IOS && !UNITY_ANDROID

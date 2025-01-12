@@ -1,86 +1,82 @@
-using DG.Tweening.Core.Easing;
-using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using UnityEngine;
-#if UNITY_EDITOR
-using UnityEngine.InputSystem;
-#endif
+using System;
 using UnityEngine.Pool;
+using UnityEngine;
 using Random = UnityEngine.Random;
 
-public class AsteroidSpawner : SingletonMonoBehaviour<AsteroidSpawner>
+public class AsteroidSpawner : MonoBehaviour
 {
-    [SerializeField] Asteroid[] _smallAsteroidPrefabs;
-    [SerializeField] Asteroid[] _mediumAsteroidPrefabs;
-    [SerializeField] Asteroid[] _largeAsteroidPrefabs;
-    [SerializeField] GameObject _explosionPrefab;
-    [SerializeField] int _asteroidsToSpawn = 4, _maxAsteroids = 10;
-    [SerializeField] float _minSpawnDistanceFromPlayer = 2f;
+    [SerializeField] private Asteroid[] _smallAsteroidPrefabs;
+    [SerializeField] private Asteroid[] _mediumAsteroidPrefabs;
+    [SerializeField] private Asteroid[] _largeAsteroidPrefabs;
+    [SerializeField] private GameObject _explosionPrefab;
+    [SerializeField] private int _asteroidsToSpawn = 4, _maxAsteroids = 10;
+    [SerializeField] private float _minSpawnDistanceFromPlayer = 2f;
 
-    readonly Dictionary<AsteroidSize, IObjectPool<Asteroid>> _asteroidPools = new();
-    readonly HashSet<Asteroid> _asteroids = new();
-    Transform _transform;
+    private readonly Dictionary<AsteroidSize, IObjectPool<Asteroid>> _asteroidPools = new();
+    private readonly List<Asteroid> _asteroids = new();
+    private Transform _transform;
+    private bool _isSpawning = false; // Prevent multiple spawn triggers
 
-    int SpawnCount => Math.Min(_asteroidsToSpawn + GameManager.Instance.Round - 1, _maxAsteroids);
+    public static AsteroidSpawner Instance { get; private set; }
+    // Calculate the number of asteroids to spawn based on the round
+    private int SpawnCount => Mathf.Min(_asteroidsToSpawn + GameManager.Instance.Round - 1, _maxAsteroids);
+    public int ActiveAsteroidsCount => _asteroids.Count;
 
-    public void DestroyAsteroid(Asteroid asteroid, Vector3 position)
+    private void Awake()
     {
-        ExplosionSpawner.Instance.SpawnExplosion(position);
-        SplitAsteroid(asteroid);
-        ReleaseAsteroidToPool(asteroid);
-        if (_asteroids.Count == 0)
+        if (Instance != null && Instance != this)
         {
-            GameManager.Instance.RoundOver();
+            Destroy(gameObject);
         }
-    }
-    protected override void Awake() // Use `override` to replace base implementation
-    {
-        base.Awake(); // Ensure the base class's Awake is called
+        else
+        {
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
         _transform = transform;
         EventBus.Instance.Subscribe<GameStateChangedEvent>(OnGameStateChanged);
     }
-    protected override void OnDestroy() // Use `override` to replace base implementation
+
+    private void OnDestroy()
     {
-        base.OnDestroy(); // Ensure the base class's OnDestroy is called
         EventBus.Instance?.Unsubscribe<GameStateChangedEvent>(OnGameStateChanged);
     }
-    void OnGameStateChanged(GameStateChangedEvent gameState)
+
+    private void OnGameStateChanged(GameStateChangedEvent gameState)
     {
+        Debug.Log($"Game state changed to: {gameState.GameState}");
+        // Only start spawning when the game state is appropriate
         if (gameState.GameState == GameState.StartFirstRound || gameState.GameState == GameState.StartRound)
         {
             SpawnAsteroids();
         }
-        else if (gameState.GameState == GameState.GameOver)
-        {
-            ReleaseAllAsteroids(); // Ensure all asteroids are released
-        }
-        if (gameState.GameState is GameState.StartFirstRound or GameState.StartRound) SpawnAsteroids();
     }
-    void SpawnAsteroids()
+
+    private void SpawnAsteroids()
     {
+        if (_isSpawning || ActiveAsteroidsCount > 0) return; // Prevent spawning if already in progress or if asteroids are active
+
+        _isSpawning = true;
         _asteroids.Clear();
-        var pool = GetPool(AsteroidSize.Large);
+        var pool = GetPool(AsteroidSize.Large); // Start with large asteroids for the round
+
+        Debug.Log("Spawning asteroids...");
+
         for (var i = 0; i < SpawnCount; i++)
         {
             var asteroid = pool.Get();
             if (!asteroid) continue;
+
             var spawnPoint = GetRandomSpawnPoint();
             asteroid.Initialize(this, spawnPoint);
             _asteroids.Add(asteroid);
         }
+
+        _isSpawning = false; // Allow spawning to occur again next round
     }
-    public void ReleaseAllAsteroids()
-    {
-        foreach (var asteroid in _asteroids)
-        {
-            asteroid.Disable();
-            GetPool(asteroid.Settings.Size).Release(asteroid);
-        }
-        _asteroids.Clear();
-    }
-    Vector3 GetRandomSpawnPoint()
+
+    private Vector3 GetRandomSpawnPoint()
     {
         var playerPosition = GameManager.Instance.PlayerShip?.transform.position ?? Vector3.zero;
         Vector3 spawnPoint;
@@ -91,42 +87,63 @@ public class AsteroidSpawner : SingletonMonoBehaviour<AsteroidSpawner>
 
         return spawnPoint;
     }
-    void SplitAsteroid(Asteroid asteroid)
+
+    // Handle asteroid destruction and splitting
+    public void DestroyAsteroid(Asteroid asteroid, Vector3 position)
+    {
+        ExplosionSpawner.Instance.SpawnExplosion(position);
+        SplitAsteroid(asteroid);
+        ReleaseAsteroidToPool(asteroid);
+
+        // If no asteroids are left, notify the game manager
+        if (_asteroids.Count == 0)
+        {
+            GameManager.Instance.RoundOver();
+        }
+    }
+
+    private void SplitAsteroid(Asteroid asteroid)
     {
         if (asteroid.Settings.Size == AsteroidSize.Small) return;
+
         var pool = GetPool(asteroid.Settings.Size - 1);
         for (var i = 0; i < 2; i++)
         {
             var newAsteroid = pool.Get();
             if (!newAsteroid) continue;
+
             newAsteroid.Initialize(this, asteroid.transform.position);
             _asteroids.Add(newAsteroid);
         }
-    }   
-    void ReleaseAsteroidToPool(Asteroid asteroid)
+    }
+
+    private void ReleaseAsteroidToPool(Asteroid asteroid)
     {
-        // Check if the asteroid is in the list before trying to remove it
-        if (_asteroids.Contains(asteroid))
-        {
-            _asteroids.Remove(asteroid);
-        }
-        else
-        {
-            Debug.LogWarning("Attempted to remove an asteroid that is not in the list.", this);
-        }
+        // Prevent releasing an already released asteroid
+        if (!_asteroids.Contains(asteroid)) return;
+
         asteroid.gameObject.SetActive(false);
+        _asteroids.Remove(asteroid);
         GetPool(asteroid.Settings.Size).Release(asteroid);
     }
-    IObjectPool<Asteroid> GetPool(AsteroidSize size)
+
+    private IObjectPool<Asteroid> GetPool(AsteroidSize size)
     {
         if (_asteroidPools.TryGetValue(size, out var pool)) return pool;
+
         pool = new ObjectPool<Asteroid>(
-            () => InstantiateAsteroid(size), OnTakeAsteroidFromPool, OnReturnAsteroidToPool, OnDestroyAsteroid,
-            collectionCheck: true, 20, 100);
+            () => InstantiateAsteroid(size),
+            OnTakeAsteroidFromPool,
+            OnReturnAsteroidToPool,
+            OnDestroyAsteroid,
+            collectionCheck: true, 20, 100
+        );
+
         _asteroidPools.Add(size, pool);
         return pool;
     }
-    Asteroid InstantiateAsteroid(AsteroidSize size)
+
+    private Asteroid InstantiateAsteroid(AsteroidSize size)
     {
         var prefab = GetRandomPrefab(size);
         if (!prefab)
@@ -134,38 +151,48 @@ public class AsteroidSpawner : SingletonMonoBehaviour<AsteroidSpawner>
             Debug.LogError("Asteroid prefab is null.", this);
             return null;
         }
+
         var asteroid = Instantiate(prefab, _transform);
         asteroid.gameObject.SetActive(false);
         return asteroid;
     }
-    void OnTakeAsteroidFromPool(Asteroid asteroid)
-    {
-    }
-    void OnReturnAsteroidToPool(Asteroid asteroid)
+
+    private void OnTakeAsteroidFromPool(Asteroid asteroid) { }
+
+    private void OnReturnAsteroidToPool(Asteroid asteroid)
     {
         asteroid.gameObject.SetActive(false);
     }
-    void OnDestroyAsteroid(Asteroid asteroid)
+
+    private void OnDestroyAsteroid(Asteroid asteroid)
     {
         Destroy(asteroid);
     }
-    Asteroid GetRandomPrefab(AsteroidSize size)
-    {
-        Asteroid[] prefabs = size switch
-        {
-            AsteroidSize.Small => _smallAsteroidPrefabs,
-            AsteroidSize.Medium => _mediumAsteroidPrefabs,
-            AsteroidSize.Large => _largeAsteroidPrefabs,
-            _ => null
-        };
 
-        if (prefabs == null || prefabs.Length == 0)
+    private Asteroid GetRandomPrefab(AsteroidSize size)
+    {
+        return size switch
         {
-            Debug.LogError("Asteroid prefab is null or empty.", this);
-            return null;
+            AsteroidSize.Small => _smallAsteroidPrefabs[Random.Range(0, _smallAsteroidPrefabs.Length)],
+            AsteroidSize.Medium => _mediumAsteroidPrefabs[Random.Range(0, _mediumAsteroidPrefabs.Length)],
+            AsteroidSize.Large => _largeAsteroidPrefabs[Random.Range(0, _largeAsteroidPrefabs.Length)],
+            _ => throw new ArgumentOutOfRangeException()
+        };
+    }
+
+    public void ReleaseAllAsteroids()
+    {
+        foreach (var asteroid in _asteroids)
+        {
+            asteroid.gameObject.SetActive(false);
+            GetPool(asteroid.Settings.Size).Release(asteroid);
         }
 
-        int randomIndex = Random.Range(0, prefabs.Length);
-        return prefabs[randomIndex];
+        _asteroids.Clear();
+    }
+    public void ResetSpawner()
+    {
+        ReleaseAllAsteroids();
+        _isSpawning = false;
     }
 }
