@@ -45,7 +45,6 @@ public class ExplosionSpawner : SingletonMonoBehaviour<ExplosionSpawner>
 
     void OnReleaseExplosion(ExplosionEffect explosion)
     {
-        Debug.Log($"Releasing explosion to pool. Disabling {explosion.name}");
         explosion.gameObject.SetActive(false);
     }
 

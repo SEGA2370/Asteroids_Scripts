@@ -72,7 +72,6 @@ public class EnemyShipSpawner : SingletonMonoBehaviour<EnemyShipSpawner>
     void SpawnShip()
     {
         if (!_enableSpawning) return;
-        Debug.Log($"Spawning enemy ship.");
         var spawnPointIndex = UnityEngine.Random.Range(0, _spawnPoints.Length);
         var ship = GetRandomShip();
         ship.Init(this, _spawnPoints[spawnPointIndex].position, GetRandomWaypoints(spawnPointIndex));

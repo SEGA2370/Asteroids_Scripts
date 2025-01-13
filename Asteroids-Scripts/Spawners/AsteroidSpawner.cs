@@ -45,7 +45,6 @@ public class AsteroidSpawner : MonoBehaviour
 
     private void OnGameStateChanged(GameStateChangedEvent gameState)
     {
-        Debug.Log($"Game state changed to: {gameState.GameState}");
         // Only start spawning when the game state is appropriate
         if (gameState.GameState == GameState.StartFirstRound || gameState.GameState == GameState.StartRound)
         {
@@ -60,8 +59,6 @@ public class AsteroidSpawner : MonoBehaviour
         _isSpawning = true;
         _asteroids.Clear();
         var pool = GetPool(AsteroidSize.Large); // Start with large asteroids for the round
-
-        Debug.Log("Spawning asteroids...");
 
         for (var i = 0; i < SpawnCount; i++)
         {
@@ -148,7 +145,6 @@ public class AsteroidSpawner : MonoBehaviour
         var prefab = GetRandomPrefab(size);
         if (!prefab)
         {
-            Debug.LogError("Asteroid prefab is null.", this);
             return null;
         }
 

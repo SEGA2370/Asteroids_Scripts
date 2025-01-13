@@ -45,6 +45,7 @@ public class MobileJoystickInput : MonoBehaviour
     void HandleDragOrStop()
     {
         var touch = Touchscreen.current.touches.FirstOrDefault(t => t.touchId.ReadValue() == _touchId);
+        if (touch == null) return; // Add this check
 
         if (touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Ended ||
             touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Canceled)

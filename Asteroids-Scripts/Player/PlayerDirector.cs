@@ -64,7 +64,6 @@ public class PlayerDirector : MonoBehaviour
 
     void OnGameStateChanged(GameStateChangedEvent gameStateChangedEvent)
     {
-        Debug.Log("Game state changed to: " + gameStateChangedEvent.GameState);
         switch (gameStateChangedEvent.GameState)
         {
             case GameState.StartFirstRound:
@@ -125,6 +124,7 @@ public class PlayerDirector : MonoBehaviour
 
     void EnableFire()
     {
+        if (_fireEnabled) return; // Prevent enabling fire if it's already enabled
         _fireEnabled = true;
         _enableFireTimer.OnTimerStop -= EnableFire;
         _enableFireTimer.Stop();

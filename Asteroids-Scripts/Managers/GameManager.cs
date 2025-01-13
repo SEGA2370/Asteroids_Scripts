@@ -39,7 +39,6 @@ public class GameManager : SingletonMonoBehaviour<GameManager>
 
     private void StartGame()
     {
-        Debug.Log("Starting Game...");
         Lives = 3;
         Score = 0;
         Round = 0;
@@ -51,7 +50,6 @@ public class GameManager : SingletonMonoBehaviour<GameManager>
     private void StartFirstRound()
     {
         if (_gameState == GameState.StartFirstRound) return; // Prevent re-triggering
-        Debug.Log("Starting First Round...");
         CreateTimers();
         Round++;
         AddPoints(0);
@@ -70,8 +68,8 @@ public class GameManager : SingletonMonoBehaviour<GameManager>
 
     public void PlayerDied()
     {
-        Debug.Log("Player died");
         EventBus.Instance.Raise(new StopAllMusicEvent());
+        _playerShip.AllowPositionReset(true); // Allow reset on death
         if (Lives > 0)
         {
             SetGameState(GameState.PlayerDied);
@@ -89,6 +87,7 @@ public class GameManager : SingletonMonoBehaviour<GameManager>
         SetGameState(GameState.GameOver);
         EventBus.Instance.Raise(new PlayMusicEvent("GameOver"));
         DisableAllActiveAsteroids();
+        _playerShip.AllowPositionReset(true); // Allow reset on death
         SettingsManager.Instance.SetSetting("HighScore", HighScore.ToString(), true);
     }
 
@@ -164,7 +163,8 @@ public class GameManager : SingletonMonoBehaviour<GameManager>
         EventBus.Instance.Raise(new PlayerLivesChangedEvent(--Lives));
         SetGameState(GameState.ShipSpawned);
         _playerShip.ReviveShip();
-        _playerShip.ResetShipToStartPosition();
+        _playerShip.AllowPositionReset(false); // Disable reset while flying
+        _playerShip.ResetShipToStartPosition(); // Reset to center only on death or game over
         _playerShip.EnableInvulnerability();
         EventBus.Instance.Raise(new PlayMusicEvent("Game"));
     }

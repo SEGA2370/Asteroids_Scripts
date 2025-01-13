@@ -10,6 +10,8 @@ public class PlayerShip : MonoBehaviour, ICollisionParent
     private bool _isAlive = true; // Track if the ship is alive
     public bool IsAlive => _isAlive; // Public property to check if the ship is alive
 
+    private bool canResetPosition = true; // Flag to control position reset
+
     bool _thrusting;
     Rigidbody2D _rigidBody;
     GhostParent _ghostParent;
@@ -23,7 +25,6 @@ public class PlayerShip : MonoBehaviour, ICollisionParent
 
     public void Collided(Collision2D collision)
     {
-        Debug.Log($"{name} collided with {collision.gameObject.name}", this);
         ExplosionSpawner.Instance.SpawnExplosion(collision.gameObject.transform.position);
 
         if (_isAlive) // Only disable if the ship is alive
@@ -31,9 +32,9 @@ public class PlayerShip : MonoBehaviour, ICollisionParent
             DisableShip(); // This should only be called on actual collisions
         }
 
-        ResetShipToStartPosition();
         _scorer?.ScorePoints(collision);
         GameManager.Instance.PlayerDied();
+        ResetShipToStartPosition();
     }
     public void FireBullet()
     {
@@ -44,7 +45,6 @@ public class PlayerShip : MonoBehaviour, ICollisionParent
         if (!_isAlive) return; // Check if the ship is already disabled
 
         _isAlive = false; // Set alive state to false
-        Debug.Log("Ship disabled. IsAlive: " + _isAlive);
         _renderer.enabled = false;
         _collider.enabled = false;
         _exhaust.SetActive(false);
@@ -56,7 +56,6 @@ public class PlayerShip : MonoBehaviour, ICollisionParent
         if (Time.time - _lastReviveTime < _reviveCooldown) return; // Prevent reviving too quickly
 
         _isAlive = true; // Set alive state to true
-        Debug.Log("Ship revived. IsAlive: " + _isAlive);
         _renderer.enabled = true; // Enable the ship's renderer
         _collider.enabled = true; // Enable the ship's collider
         _exhaust.SetActive(true); // Activate the exhaust effect
@@ -70,12 +69,18 @@ public class PlayerShip : MonoBehaviour, ICollisionParent
     }
     public void ResetShipToStartPosition()
     {
-        if (!_isAlive) return; // Prevent resetting if the ship is not alive
+        if (!_isAlive || !canResetPosition) return; // Prevent resetting if the ship is not alive or if resets are disabled
         transform.position = Vector3.zero;
         _rigidBody.velocity = Vector2.zero;
         _rigidBody.angularVelocity = 0f;
         transform.localRotation = Quaternion.identity;
     }
+
+    public void AllowPositionReset(bool allow)
+    {
+        canResetPosition = allow; // Method to enable or disable position resets
+    }
+
     public void EnableInvulnerability()
     {
         _collider.enabled = false;

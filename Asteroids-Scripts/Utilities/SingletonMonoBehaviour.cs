@@ -28,13 +28,11 @@ public class SingletonMonoBehaviour<T> : MonoBehaviour where T : MonoBehaviour
                         GameObject singletonObject = new GameObject(typeof(T).Name);
                         _instance = singletonObject.AddComponent<T>();
                         DontDestroyOnLoad(singletonObject);
-
-                        Debug.Log($"[SingletonMonoBehaviour] An instance of '{typeof(T)}' is created with DontDestroyOnLoad.");
                     }
-                    else
-                    {
-                        Debug.Log($"[SingletonMonoBehaviour] Using already created instance of '{typeof(T)}': {_instance.gameObject.name}.");
-                    }
+                    //else
+                    //{
+                    //    Debug.Log($"[SingletonMonoBehaviour] Using already created instance of '{typeof(T)}': {_instance.gameObject.name}.");
+                    //}
                 }
 
                 return _instance;
@@ -67,7 +65,6 @@ public class SingletonMonoBehaviour<T> : MonoBehaviour where T : MonoBehaviour
         }
         else if (_instance != this)
         {
-            Debug.LogWarning($"[SingletonMonoBehaviour] Another instance of '{typeof(T)}' exists. Destroying: {gameObject.name}");
             Destroy(gameObject);
         }
     }
