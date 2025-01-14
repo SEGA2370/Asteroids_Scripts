@@ -30,11 +30,11 @@ public class GameManager : SingletonMonoBehaviour<GameManager>
 
     public void RestartGame()
     {
+        Debug.Log("GameManager RestartGame called.");
         AsteroidSpawner.Instance.ReleaseAllAsteroids();
         ReleaseTimers();
         SetGameState(GameState.StartGame);
         StartGame();
-        Resources.UnloadUnusedAssets(); // Consider removing this unless necessary
     }
 
     private void StartGame()
@@ -101,12 +101,12 @@ public class GameManager : SingletonMonoBehaviour<GameManager>
 
     private void StartNextRoundTimer()
     {
-        _nextRoundTimer.Start(3f);
+        _nextRoundTimer?.Start(3f);
     }
 
     private void StartSpawnShipTimer()
     {
-        _spawnShipTimer.Start(_spawnShipDelayTime);
+        _spawnShipTimer?.Start(_spawnShipDelayTime);
     }
 
     public void AddPoints(int points)

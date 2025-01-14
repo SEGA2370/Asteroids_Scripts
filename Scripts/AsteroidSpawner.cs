@@ -19,7 +19,6 @@ public class AsteroidSpawner : MonoBehaviour
     private bool _isSpawning = false; // Prevent multiple spawn triggers
 
     public static AsteroidSpawner Instance { get; private set; }
-    // Calculate the number of asteroids to spawn based on the round
     private int SpawnCount => Mathf.Min(_asteroidsToSpawn + GameManager.Instance.Round - 1, _maxAsteroids);
     public int ActiveAsteroidsCount => _asteroids.Count;
 
@@ -80,7 +79,8 @@ public class AsteroidSpawner : MonoBehaviour
         do
         {
             spawnPoint = ViewportHelper.Instance.GetRandomVisiblePosition();
-        } while (Vector3.Distance(spawnPoint, playerPosition) < _minSpawnDistanceFromPlayer);
+        } 
+        while (Vector3.Distance(spawnPoint, playerPosition) < _minSpawnDistanceFromPlayer);
 
         return spawnPoint;
     }

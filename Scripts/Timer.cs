@@ -3,10 +3,12 @@ using System;
 public abstract class Timer
 {
     protected float InitialTime;
-    protected float Time { get; set; }
-    protected bool IsRunning { get; private set; }
 
-    public float Progress => Time / InitialTime;
+    protected float Time { get; set; }
+
+    public bool IsRunning;
+
+    public float Progress => InitialTime > 0 ? Time / InitialTime : 0;
 
     public Action OnTimerStart = delegate { };
     public Action OnTimerStop = delegate { };
@@ -16,16 +18,24 @@ public abstract class Timer
         IsRunning = false;
     }
 
-    public void SetInitialTime(float value) => InitialTime = value;
+    public void SetInitialTime(float value)
+    {
+        if (value < 0)
+            throw new ArgumentException("InitialTime cannot be negative.");
+
+        InitialTime = value;
+    }
 
     public void Start(float? initialTime = null)
     {
-        if (initialTime != null)
+        if (initialTime.HasValue)
         {
-            InitialTime = (float)initialTime;
+            SetInitialTime(initialTime.Value);
         }
+
         Time = InitialTime;
         if (IsRunning) return;
+
         IsRunning = true;
         OnTimerStart.Invoke();
     }
@@ -33,29 +43,45 @@ public abstract class Timer
     public void Stop()
     {
         if (!IsRunning) return;
+
         IsRunning = false;
+        Time = 0;
         OnTimerStop.Invoke();
     }
 
-    public void Resume() => IsRunning = true;
-    public void Pause() => IsRunning = false;
+    public void Resume()
+    {
+        if (!IsRunning && Time > 0)
+        {
+            IsRunning = true;
+        }
+    }
+
+    public void Pause()
+    {
+        if (IsRunning)
+        {
+            IsRunning = false;
+        }
+    }
+
+    public virtual void Reset()
+    {
+        Time = InitialTime;
+        IsRunning = false;
+    }
 
     public abstract void Tick(float deltaTime);
 }
 
 public class CountdownTimer : Timer
 {
-    public CountdownTimer() : base()
-    {
-    }
     public override void Tick(float deltaTime)
     {
-        if (IsRunning && Time > 0)
-        {
-            Time -= deltaTime;
-        }
+        if (!IsRunning) return;
 
-        if (IsRunning && Time <= 0)
+        Time = Math.Max(Time - deltaTime, 0);
+        if (Time <= 0)
         {
             Stop();
         }
@@ -63,11 +89,14 @@ public class CountdownTimer : Timer
 
     public bool IsFinished => Time <= 0;
 
-    public void Reset() => Time = InitialTime;
+    public override void Reset()
+    {
+        base.Reset();
+    }
 
     public void Reset(float newTime)
     {
-        InitialTime = newTime;
+        SetInitialTime(newTime);
         Reset();
     }
 }
@@ -82,7 +111,11 @@ public class StopwatchTimer : Timer
         }
     }
 
-    public void Reset() => Time = 0;
+    public override void Reset()
+    {
+        Time = 0;
+        IsRunning = false;
+    }
 
     public float GetTime() => Time;
 }

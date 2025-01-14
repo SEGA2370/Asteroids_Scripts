@@ -20,8 +20,10 @@ public class TimerManager : SingletonMonoBehaviour<TimerManager>
     public void ReleaseTimer<T>(Timer timer)
     {
         if (timer == null) return;
+
         var pool = GetTimerPool<T>();
         if (_timers.Contains(timer)) _timers.Remove(timer);
+        timer.Stop(); // Ensure timer is stopped before releasing
         pool.Release(timer);
     }
 

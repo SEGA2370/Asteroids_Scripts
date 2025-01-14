@@ -4,34 +4,32 @@ using UnityEngine.InputSystem;
 
 public class MobileJoystickInput : MonoBehaviour
 {
-    [SerializeField] RectTransform _background;
-    [SerializeField] RectTransform _handle;
-    [SerializeField] float _handleRange = 100f;
+    [SerializeField] private RectTransform _background;
+    [SerializeField] private RectTransform _handle;
+    [SerializeField] private float _handleRange = 100f;
 
     public Vector2 Direction { get; private set; }
 
     private Vector2 _input = Vector2.zero;
     private int _touchId = -1;
 
-    void Update()
+    private void Update()
     {
         if (_touchId == -1)
         {
             CheckForDragStart();
-            return;
         }
-
-        HandleDragOrStop();
+        else
+        {
+            HandleDragOrStop();
+        }
     }
 
-    void CheckForDragStart()
+    private void CheckForDragStart()
     {
         if (Touchscreen.current == null) return;
 
-        var touches = Touchscreen.current.touches
-            .Where(t => t.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Began);
-
-        foreach (var touch in touches)
+        foreach (var touch in Touchscreen.current.touches.Where(t => t.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Began))
         {
             var pointerPos = touch.position.ReadValue();
             if (RectTransformUtility.RectangleContainsScreenPoint(_background, pointerPos, null))
@@ -42,13 +40,11 @@ public class MobileJoystickInput : MonoBehaviour
         }
     }
 
-    void HandleDragOrStop()
+    private void HandleDragOrStop()
     {
         var touch = Touchscreen.current.touches.FirstOrDefault(t => t.touchId.ReadValue() == _touchId);
-        if (touch == null) return; // Add this check
 
-        if (touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Ended ||
-            touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Canceled)
+        if (touch == null || touch.phase.ReadValue() is UnityEngine.InputSystem.TouchPhase.Ended or UnityEngine.InputSystem.TouchPhase.Canceled)
         {
             ResetHandle();
             _touchId = -1;
@@ -63,7 +59,7 @@ public class MobileJoystickInput : MonoBehaviour
         Direction = _input / _handleRange;
     }
 
-    void ResetHandle()
+    private void ResetHandle()
     {
         _handle.anchoredPosition = Vector2.zero;
         Direction = Vector2.zero;

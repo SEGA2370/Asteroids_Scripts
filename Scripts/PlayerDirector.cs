@@ -1,45 +1,43 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class PlayerDirector : MonoBehaviour
 {
-    [SerializeField] PlayerShip _playerShip;
-    [SerializeField] float _fireDelay = 0.15f, _invulnerabilityDuration = 3f;
-    [SerializeField] MobileButton _hyperspaceButton; // Reference to the MobileButton
+    [SerializeField] private PlayerShip _playerShip;
+    [SerializeField] private float _fireDelay = 0.15f;
+    [SerializeField] private float _invulnerabilityDuration = 3f;
+    [SerializeField] private MobileButton _hyperspaceButton;
 
-    PlayerInputBase _playerInput;
-    bool _fireEnabled, _hyperspaceEnabled, _isInvulnerable;
-    Timer _enableFireTimer;
-    Timer _enableHyperspaceTimer;
-    Timer _cancelInvulnerabilityTimer;
+    private PlayerInputBase _playerInput;
+    private bool _fireEnabled, _hyperspaceEnabled, _isInvulnerable;
+    private Timer _enableFireTimer, _enableHyperspaceTimer, _cancelInvulnerabilityTimer;
 
-    void Awake()
+    private void Awake()
     {
 #if UNITY_IOS || UNITY_ANDROID
         _playerInput = FindObjectOfType<PlayerTouchInput>();
-
 #else
         _playerInput = gameObject.AddComponent<PlayerKeyboardInput>();
 #endif
     }
 
-    void OnEnable()
+    private void OnEnable()
     {
         CreateTimers();
         EventBus.Instance.Subscribe<GameStateChangedEvent>(OnGameStateChanged);
     }
 
-    void OnDisable()
+    private void OnDisable()
     {
         EventBus.Instance?.Unsubscribe<GameStateChangedEvent>(OnGameStateChanged);
         ReleaseTimers();
     }
 
-    void Update()
+    private void Update()
     {
-        if (!_playerShip.IsAlive) return; // Prevent any input if the ship is not alive
+        if (!_playerShip.IsAlive) return;
+
         CheckInvulnerability();
         HandleRotationInput();
         HandleThrustInput();
@@ -47,22 +45,21 @@ public class PlayerDirector : MonoBehaviour
         HandleHyperspaceInput();
     }
 
-    void CreateTimers()
+    private void CreateTimers()
     {
-        if (_enableFireTimer != null && _enableHyperspaceTimer != null && _cancelInvulnerabilityTimer != null) return;
-        _enableFireTimer = TimerManager.Instance.CreateTimer<CountdownTimer>();
-        _enableHyperspaceTimer = TimerManager.Instance.CreateTimer<CountdownTimer>();
-        _cancelInvulnerabilityTimer = TimerManager.Instance.CreateTimer<CountdownTimer>();
+        _enableFireTimer ??= TimerManager.Instance.CreateTimer<CountdownTimer>();
+        _enableHyperspaceTimer ??= TimerManager.Instance.CreateTimer<CountdownTimer>();
+        _cancelInvulnerabilityTimer ??= TimerManager.Instance.CreateTimer<CountdownTimer>();
     }
 
-    void ReleaseTimers()
+    private void ReleaseTimers()
     {
         TimerManager.Instance?.ReleaseTimer<CountdownTimer>(_enableFireTimer);
         TimerManager.Instance?.ReleaseTimer<CountdownTimer>(_enableHyperspaceTimer);
         TimerManager.Instance?.ReleaseTimer<CountdownTimer>(_cancelInvulnerabilityTimer);
     }
 
-    void OnGameStateChanged(GameStateChangedEvent gameStateChangedEvent)
+    private void OnGameStateChanged(GameStateChangedEvent gameStateChangedEvent)
     {
         switch (gameStateChangedEvent.GameState)
         {
@@ -73,10 +70,8 @@ public class PlayerDirector : MonoBehaviour
                 _playerShip.ResetShipToStartPosition();
                 _playerShip.EnableRenderer();
                 EnableInvulnerability();
-                _fireEnabled = true;
-                _hyperspaceEnabled = false;
-                _enableHyperspaceTimer.OnTimerStop += EnableHyperspace;
-                _enableHyperspaceTimer.Start(5f);
+                EnableFire();
+                DisableHyperspace();
                 break;
             case GameState.PlayerDied:
             case GameState.GameOver:
@@ -85,86 +80,84 @@ public class PlayerDirector : MonoBehaviour
         }
     }
 
-    void CheckInvulnerability()
+    private void CheckInvulnerability()
     {
-        if (!_isInvulnerable) return;
-        if (!_playerInput.AnyInputThisFrame) return;
+        if (!_isInvulnerable || !_playerInput.AnyInputThisFrame) return;
         CancelInvulnerability();
     }
 
-    void EnableInvulnerability()
+    private void EnableInvulnerability()
     {
         if (_isInvulnerable) return;
+
         _isInvulnerable = true;
         _cancelInvulnerabilityTimer.OnTimerStop += CancelInvulnerability;
         _cancelInvulnerabilityTimer.Start(_invulnerabilityDuration);
         _playerShip.EnableInvulnerability();
     }
 
-    void CancelInvulnerability()
+    private void CancelInvulnerability()
     {
         if (!_isInvulnerable) return;
-        _isInvulnerable = false; // Reset invulnerability state
+
+        _isInvulnerable = false;
         _cancelInvulnerabilityTimer.OnTimerStop -= CancelInvulnerability;
         _cancelInvulnerabilityTimer.Stop();
         _playerShip.CancelInvulnerability();
     }
 
-    void HandleRotationInput()
+    private void HandleRotationInput()
     {
-        var rotationInput = _playerInput.GetRotationInput();
+        float rotationInput = _playerInput.GetRotationInput();
         if (Mathf.Approximately(rotationInput, 0f)) return;
         _playerShip.Rotate(rotationInput);
     }
 
-    void HandleThrustInput()
+    private void HandleThrustInput()
     {
         _playerShip.SetThrust(_playerInput.GetThrustInput());
     }
 
-    void EnableFire()
+    private void EnableFire()
     {
-        if (_fireEnabled) return; // Prevent enabling fire if it's already enabled
         _fireEnabled = true;
         _enableFireTimer.OnTimerStop -= EnableFire;
         _enableFireTimer.Stop();
     }
 
-    void DisableFire()
+    private void DisableFire()
     {
         _fireEnabled = false;
         _enableFireTimer.OnTimerStop += EnableFire;
         _enableFireTimer.Start(_fireDelay);
     }
 
-    void HandleFireInput()
+    private void HandleFireInput()
     {
-        if (!_fireEnabled) return;
-        if (!_playerInput.GetFireInput()) return;
+        if (!_fireEnabled || !_playerInput.GetFireInput()) return;
         DisableFire();
         _playerShip.FireBullet();
     }
 
-    void EnableHyperspace()
+    private void EnableHyperspace()
     {
         _hyperspaceEnabled = true;
         _enableHyperspaceTimer.OnTimerStop -= EnableHyperspace;
         _enableHyperspaceTimer.Stop();
-        _hyperspaceButton.FadeHyperspaceButton(1f);
+        _hyperspaceButton?.FadeHyperspaceButton(1f);
     }
 
-    void DisableHyperspace()
+    private void DisableHyperspace()
     {
         _hyperspaceEnabled = false;
         _enableHyperspaceTimer.OnTimerStop += EnableHyperspace;
         _enableHyperspaceTimer.Start(5f);
-        _hyperspaceButton.FadeHyperspaceButton(0f);
+        _hyperspaceButton?.FadeHyperspaceButton(0f);
     }
 
-    void HandleHyperspaceInput()
+    private void HandleHyperspaceInput()
     {
-        if (!_hyperspaceEnabled) return;
-        if (!_playerInput.GetHyperspaceInput()) return;
+        if (!_hyperspaceEnabled || !_playerInput.GetHyperspaceInput()) return;
         DisableHyperspace();
         _playerShip.EnterHyperspace();
     }
